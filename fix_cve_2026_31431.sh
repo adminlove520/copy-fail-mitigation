@@ -29,13 +29,22 @@ if lsmod | grep -q "^algif_aead"; then
     REF_COUNT=$(lsmod | grep "^algif_aead" | awk '{print $3}')
 fi
 
+FORCE=0
+if [[ "$1" == "-y" || "$1" == "--yes" ]]; then
+    FORCE=1
+fi
+
 if [ "$LOADED" -eq 1 ] && [ "$REF_COUNT" -gt 0 ]; then
     echo -e "${YELLOW}Warning: algif_aead is currently in use (Ref count: $REF_COUNT).${NC}"
     echo "Disabling this module may affect applications using AF_ALG crypto interface."
-    read -p "Do you want to proceed with mitigation? [y/N] " response
-    if [[ ! "$response" =~ ^[yY]$ ]]; then
-        echo "Remediation cancelled."
-        exit 0
+    if [ "$FORCE" -eq 0 ]; then
+        read -p "Do you want to proceed with mitigation? [y/N] " response
+        if [[ ! "$response" =~ ^[yY]$ ]]; then
+            echo "Remediation cancelled."
+            exit 0
+        fi
+    else
+        echo "Force flag detected. Proceeding..."
     fi
 fi
 

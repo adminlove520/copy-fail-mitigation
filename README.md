@@ -42,6 +42,8 @@ Run the remediation script as root to apply the mitigation. The script will chec
 ```bash
 chmod +x fix_cve_2026_31431.sh
 sudo ./fix_cve_2026_31431.sh
+# For non-interactive mode:
+sudo ./fix_cve_2026_31431.sh -y
 ```
 
 **Note**: The mitigation involves disabling the `algif_aead` kernel module. If your applications rely on `AF_ALG` for AEAD encryption (e.g., some hardware-accelerated crypto tasks), ensure they have fallbacks or are not critical.

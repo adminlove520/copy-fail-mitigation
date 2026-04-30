@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.0.0] - 2026-04-30
+
+### Enhanced (Deep Verification)
+- **Multi-Vector Probing**: Detection and verification now test multiple cryptographic interfaces (`aead`, `hash`, `skcipher`) and specific complex AEAD bindings used in real exploits.
+- **Improved Reporting**: Detailed per-interface status reporting in `check.sh` and `verify_active.sh`.
+- **Logic Refinement**: Unified the probing logic into `lib_common.sh` for consistency across all tools.
+- **Safety**: Improved user switching and timeout handling for more reliable probing on restricted systems.
+
 ## [1.9.1] - 2026-04-30
 
 ### Fixed

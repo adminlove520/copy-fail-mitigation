@@ -1,6 +1,6 @@
 #!/bin/bash
 # Common Library for CVE-2026-31431 Mitigation Scripts
-# v1.9.1 - Rigorous & Bugfix (Hang fixed)
+# v2.0.0 - Advanced Deep Verification
 
 # Colors
 RED='\033[1;31m'
@@ -103,44 +103,49 @@ function check_security_modules() {
     local status=""
     if command -v sestatus &>/dev/null; then
         local selinux=$(timeout 1s sestatus 2>/dev/null | grep 'SELinux status' | awk '{print $3}')
-        [[ -n "$selinux" ]] && status+="SELinux: $selinux "
+        [[ -n "$selinux" ]] && status+="SELinux:$selinux "
     fi
     if command -v aa-status &>/dev/null; then
         if timeout 1s aa-status --enabled &>/dev/null; then
-            status+="AppArmor: Enabled "
+            status+="AppArmor:Enabled "
         fi
     elif [ -d /sys/kernel/security/apparmor ]; then
-        status+="AppArmor: Enabled "
+        status+="AppArmor:Enabled "
     fi
     echo "${status:-None}"
 }
 
-# Helper: Functional check logic (shared by check and verify)
+# Helper: Multi-Algorithm Crypto Probe (Deep Verification)
 function check_unprivileged_crypto() {
-    # We use a python script that drops privileges if run as root
-    # This avoids using 'su' or 'runuser' which can hang in some environments
     local py_cmd="import socket, os, sys
-def test():
+def probe(ctype, alg):
     try:
-        if os.getuid() == 0:
-            try:
-                os.setuid(65534) # nobody
-            except:
-                pass
-        s = socket.socket(38, 5, 0) # AF_ALG
-        # Using a simpler binding for stability
-        s.bind(('aead', 'aes'))
-        print('ACCESSIBLE')
-    except:
-        print('BLOCKED')
-test()"
+        s = socket.socket(38, 5, 0)
+        s.bind((ctype, alg))
+        return 'OK'
+    except PermissionError: return 'PERM'
+    except: return 'ERR'
+
+if os.getuid() == 0:
+    try: os.setuid(65534)
+    except: pass
+
+results = []
+# 1. Test AEAD (Primary vulnerability vector)
+results.append('AEAD:' + probe('aead', 'aes'))
+# 2. Test Complex AEAD (Actual exploit vector)
+results.append('AEAD_EXPL:' + probe('aead', 'authencesn(hmac(sha256),cbc(aes))'))
+# 3. Test Hash & Skcipher (Secondary vectors blocked by fix.sh)
+results.append('HASH:' + probe('hash', 'sha256'))
+results.append('SKCIPHER:' + probe('skcipher', 'cbc(aes)'))
+
+print('|'.join(results))"
 
     if ! command -v python3 &>/dev/null; then
         echo "UNKNOWN"
         return
     fi
 
-    # Use timeout to prevent kernel-level hangs if the driver is buggy
     local res=$(timeout 3s python3 -c "$py_cmd" 2>/dev/null)
-    echo "${res:-BLOCKED}"
+    echo "${res:-TIMEOUT}"
 }

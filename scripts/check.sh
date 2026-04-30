@@ -1,6 +1,5 @@
 #!/bin/bash
-# CVE-2026-31431 Detection Script (Deep v2.0.0)
-# UI Optimized - Production Ready
+# v2.1.0 - Anti-Hang Optimization
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib_common.sh"

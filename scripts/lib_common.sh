@@ -1,6 +1,6 @@
 #!/bin/bash
 # Common Library for CVE-2026-31431 Mitigation Scripts
-# v2.0.0 - Advanced Deep Verification
+# v2.1.0 - Robustness & Anti-Hang
 
 # Colors
 RED='\033[1;31m'
@@ -13,12 +13,17 @@ NC='\033[0m'
 
 LOG_FILE="/tmp/cve-2026-31431.log"
 
-# Initialization: Setup log file once
-if [[ ! -w "$LOG_FILE" ]]; then
-    rm -f "$LOG_FILE" 2>/dev/null
-    touch "$LOG_FILE" 2>/dev/null && chmod 666 "$LOG_FILE" 2>/dev/null
-fi
-[[ ! -w "$LOG_FILE" ]] && LOG_FILE="/dev/null"
+# Initialization: Setup log file safely
+function init_log() {
+    # If log exists and not writable, try to recreate it
+    if [[ -e "$LOG_FILE" && ! -w "$LOG_FILE" ]]; then
+        rm -f "$LOG_FILE" 2>/dev/null
+    fi
+    # Only touch if it doesn't exist
+    [[ ! -e "$LOG_FILE" ]] && touch "$LOG_FILE" 2>/dev/null && chmod 666 "$LOG_FILE" 2>/dev/null
+    [[ ! -w "$LOG_FILE" ]] && LOG_FILE="/dev/null"
+}
+init_log
 
 # UI Helpers
 function print_banner() {
@@ -54,11 +59,10 @@ function log() {
     local color=$1
     local msg=$2
     echo -e "${color}${msg}${NC}"
-    {
-        if [[ -w "$LOG_FILE" ]]; then
-            echo -e "$(date '+%Y-%m-%d %H:%M:%S') $msg" | sed 's/\x1b\[[0-9;]*m//g' >> "$LOG_FILE"
-        fi
-    } 2>/dev/null
+    # Ensure we don't block on logging
+    if [[ "$LOG_FILE" != "/dev/null" ]]; then
+        echo -e "$(date '+%Y-%m-%d %H:%M:%S') $msg" | sed 's/\x1b\[[0-9;]*m//g' >> "$LOG_FILE" 2>/dev/null &
+    fi
 }
 
 # Helper: Check dependencies
@@ -102,11 +106,11 @@ function is_builtin() {
 function check_security_modules() {
     local status=""
     if command -v sestatus &>/dev/null; then
-        local selinux=$(timeout 1s sestatus 2>/dev/null | grep 'SELinux status' | awk '{print $3}')
+        local selinux=$(timeout 2s sestatus 2>/dev/null | grep 'SELinux status' | awk '{print $3}')
         [[ -n "$selinux" ]] && status+="SELinux:$selinux "
     fi
     if command -v aa-status &>/dev/null; then
-        if timeout 1s aa-status --enabled &>/dev/null; then
+        if timeout 2s aa-status --enabled &>/dev/null; then
             status+="AppArmor:Enabled "
         fi
     elif [ -d /sys/kernel/security/apparmor ]; then
@@ -115,37 +119,35 @@ function check_security_modules() {
     echo "${status:-None}"
 }
 
-# Helper: Multi-Algorithm Crypto Probe (Deep Verification)
-function check_unprivileged_crypto() {
-    local py_cmd="import socket, os, sys
+# Helper: Python Probe Source
+PY_PROBE_SRC="import socket, os, sys
 def probe(ctype, alg):
     try:
         s = socket.socket(38, 5, 0)
+        s.settimeout(1)
         s.bind((ctype, alg))
         return 'OK'
-    except PermissionError: return 'PERM'
     except: return 'ERR'
 
 if os.getuid() == 0:
     try: os.setuid(65534)
     except: pass
 
-results = []
-# 1. Test AEAD (Primary vulnerability vector)
-results.append('AEAD:' + probe('aead', 'aes'))
-# 2. Test Complex AEAD (Actual exploit vector)
-results.append('AEAD_EXPL:' + probe('aead', 'authencesn(hmac(sha256),cbc(aes))'))
-# 3. Test Hash & Skcipher (Secondary vectors blocked by fix.sh)
-results.append('HASH:' + probe('hash', 'sha256'))
-results.append('SKCIPHER:' + probe('skcipher', 'cbc(aes)'))
+res = []
+res.append('AEAD:' + probe('aead', 'aes'))
+res.append('AEAD_EXPL:' + probe('aead', 'authencesn(hmac(sha256),cbc(aes))'))
+res.append('HASH:' + probe('hash', 'sha256'))
+res.append('SKCIPHER:' + probe('skcipher', 'cbc(aes)'))
+print('|'.join(res))"
 
-print('|'.join(results))"
-
+# Helper: Multi-Algorithm Crypto Probe (Deep Verification)
+function check_unprivileged_crypto() {
     if ! command -v python3 &>/dev/null; then
         echo "UNKNOWN"
         return
     fi
 
-    local res=$(timeout 3s python3 -c "$py_cmd" 2>/dev/null)
+    # Run probe with double timeout (process + internal socket timeout)
+    local res=$(timeout 5s python3 -c "$PY_PROBE_SRC" 2>/dev/null)
     echo "${res:-TIMEOUT}"
 }

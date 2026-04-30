@@ -1,6 +1,4 @@
-#!/bin/bash
-# CVE-2026-31431 Active Verification Script (Deep v2.0.0)
-# UI Optimized - Production Ready
+# v2.1.0 - Anti-Hang Optimization
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib_common.sh"
@@ -45,8 +43,8 @@ print_step "1/2" "${T[setup]}"
 useradd -m -s /bin/bash "$TEST_USER" &>/dev/null
 
 print_step "2/2" "${T[probing]}"
-# Run the probe as the new user
-PROBE_RAW=$(su - "$TEST_USER" -c "bash -c \"source $SCRIPT_DIR/lib_common.sh; check_unprivileged_crypto\"" 2>/dev/null)
+# Run the probe as the new user using a direct python call to avoid sub-shell/source hangs
+PROBE_RAW=$(timeout 10s su -s /bin/bash "$TEST_USER" -c "python3 -c \"$PY_PROBE_SRC\"" 2>/dev/null)
 
 ACCESSIBLE_COUNT=0
 IFS='|' read -ra ADDR <<< "$PROBE_RAW"

@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.1.0] - 2026-04-30
+
+### Fixed (Stability & Performance)
+- **Anti-Hang Mechanism**: Re-implemented the unprivileged probe to be completely independent of shell environment sourcing or `su -` login shells, which were causing hangs on some distributions.
+- **Double Timeout Protection**: 
+  - Added a process-level `timeout` (Bash).
+  - Added a socket-level `settimeout` (Python).
+- **Asynchronous Logging**: Logging now runs in the background to prevent disk I/O from blocking script execution.
+- **Robustness**: Refined the `nobody` user transition and log file permission handling for restricted environments.
+
 ## [2.0.0] - 2026-04-30
 
 ### Enhanced (Deep Verification)

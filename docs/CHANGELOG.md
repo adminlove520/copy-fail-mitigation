@@ -2,6 +2,16 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.8.0] - 2026-04-30
+
+### Optimized (UI & UX)
+- **Professional UI**: Added an ASCII art banner and a structured "Step-by-Step" progress indicator to all scripts.
+- **Enhanced Readability**: Standardized color-coded status reporting and final result summaries.
+- **Improved Robustness**:
+  - Silenced logging errors when running as unprivileged users (e.g., in `verify_active.sh`).
+  - Refined the "Final Verdict" logic for better clarity.
+- **Verified on WSL**: Fully tested on WSL2 (Kali Linux) to ensure compatibility with modern environments.
+
 ## [1.7.0] - 2026-04-30
 
 ### Optimized (Production Ready)

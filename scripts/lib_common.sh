@@ -1,15 +1,38 @@
 #!/bin/bash
 # Common Library for CVE-2026-31431 Mitigation Scripts
-# v1.7.0 - Production Ready
+# v1.8.0 - UI Optimized
 
 # Colors
-RED='\033[0;31m'
-GREEN='\033[0;32m'
+RED='\033[1;31m'
+GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
+BLUE='\033[1;34m'
+CYAN='\033[1;36m'
+BOLD='\033[1m'
 NC='\033[0m'
 
 LOG_FILE="/tmp/cve-2026-31431.log"
+# Ensure log file is writable
+if [ -f "$LOG_FILE" ] && [ ! -w "$LOG_FILE" ]; then rm -f "$LOG_FILE" 2>/dev/null; fi
+touch "$LOG_FILE" 2>/dev/null && chmod 666 "$LOG_FILE" 2>/dev/null
+[[ ! -w "$LOG_FILE" ]] && LOG_FILE="/dev/null"
+
+# UI Helpers
+function print_banner() {
+    echo -e "${CYAN}"
+    echo "    __________________     ____  ___  ___  ____"
+    echo "   / ____/ | / / ____/    / __ \/   |/   |/ __ \\"
+    echo "  / /   /  |/ / __/______/ /_/ / /| / /| / / / /"
+    echo " / /___/ /|  / /__/_____/ ____/ ___/ ___/ /_/ /"
+    echo " \____/_/ |_/_____/    /_/   /_/  /_/  /_____/ "
+    echo -e "          CVE-2026-31431 Mitigation Toolkit${NC}\n"
+}
+
+function print_step() {
+    log "${CYAN}" "${BOLD}[ STEP $1 ]${NC} $2"
+}
+
+# Language Detection & Override
 # Ensure log file is writable
 if [ -f "$LOG_FILE" ] && [ ! -w "$LOG_FILE" ]; then
     rm -f "$LOG_FILE" 2>/dev/null
@@ -36,10 +59,12 @@ function log() {
     local msg=$2
     echo -e "${color}${msg}${NC}"
     # Strip ANSI colors for file log
-    # Skip logging if we don't have write permission (e.g. running as sub-user)
-    if [ -w "$LOG_FILE" ]; then
-        echo -e "$(date '+%Y-%m-%d %H:%M:%S') $msg" | sed 's/\x1b\[[0-9;]*m//g' >> "$LOG_FILE"
-    fi
+    # Skip logging if we don't have write permission
+    {
+        if [ -w "$LOG_FILE" ]; then
+            echo -e "$(date '+%Y-%m-%d %H:%M:%S') $msg" | sed 's/\x1b\[[0-9;]*m//g' >> "$LOG_FILE"
+        fi
+    } 2>/dev/null
 }
 
 # Helper: Check dependencies

@@ -1,6 +1,6 @@
 #!/bin/bash
-# CVE-2026-31431 Active Verification Script (v1.7.0)
-# Production Ready - With Security Traps and Temp User Cleanup
+# CVE-2026-31431 Active Verification Script (v1.8.0)
+# UI Optimized - Production Ready
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib_common.sh"
@@ -27,24 +27,23 @@ trap cleanup EXIT
 # Translations
 declare -A T
 if [[ "$CURRENT_LANG" == "zh" ]]; then
-    T[header]=" CVE-2026-31431 (Copy Fail) 闭环真实性验证 v1.7.0"
-    T[setup]="[*] 正在准备安全测试环境 (用户: $TEST_USER)..."
-    T[probing]="[*] 正在以非特权身份模拟攻击路径..."
-    T[vulnerable]="[!] 严重警告: 系统利用路径依然存在！修复未奏效。"
-    T[safe]="[+] 验证成功: 系统已成功阻断真实攻击探测。"
+    T[header]="CVE-2026-31431 (Copy Fail) 主动模拟验证"
+    T[setup]="准备隔离测试环境 (用户: $TEST_USER)"
+    T[probing]="模拟非特权攻击路径探测"
+    T[vulnerable]="严重警告: 系统利用路径依然存在！修复未生效。"
+    T[safe]="验证成功: 系统已阻断真实攻击探测，修复有效。"
 else
-    T[header]=" CVE-2026-31431 (Copy Fail) Active Verification v1.7.0"
-    T[setup]="[*] Preparing isolated test environment (User: $TEST_USER)..."
-    T[probing]="[*] Probing exploit path as unprivileged user..."
-    T[vulnerable]="[!] CRITICAL WARNING: Exploit path is OPEN! Mitigation FAILED."
-    T[safe]="[+] VERIFIED: Exploit path is BLOCKED. Mitigation is EFFECTIVE."
+    T[header]="CVE-2026-31431 (Copy Fail) Active Verification"
+    T[setup]="Preparing isolated environment (User: $TEST_USER)"
+    T[probing]="Probing exploit path as unprivileged user"
+    T[vulnerable]="CRITICAL WARNING: Exploit path is OPEN! Mitigation failed."
+    T[safe]="VERIFIED: Exploit path is blocked. Mitigation is effective."
 fi
 
-echo "==============================================================="
-echo "${T[header]}"
-echo "==============================================================="
+print_banner
+echo -e "${BOLD}>>> ${T[header]}${NC}\n"
 
-log "${BLUE}" "${T[setup]}"
+print_step "1/2" "${T[setup]}"
 useradd -m -s /bin/bash "$TEST_USER" &>/dev/null
 
 cat <<EOF > "$TEMP_SCRIPT"
@@ -58,15 +57,15 @@ except:
 EOF
 chmod 644 "$TEMP_SCRIPT"
 
-log "${BLUE}" "${T[probing]}"
+print_step "2/2" "${T[probing]}"
 RESULT=$(su - "$TEST_USER" -c "python3 $TEMP_SCRIPT" 2>/dev/null)
 
-echo "---------------------------------------------------------------"
+echo -e "${BOLD}---------------------------------------------------------------${NC}"
 if [[ "$RESULT" == *"SUCCESS"* ]]; then
-    log "${RED}" "${T[vulnerable]}"
+    log "${RED}" "  ${T[vulnerable]}"
 else
-    log "${GREEN}" "${T[safe]}"
+    log "${GREEN}" "  ${T[safe]}"
 fi
-echo "==============================================================="
+echo -e "${BOLD}---------------------------------------------------------------${NC}"
 
 exit 0

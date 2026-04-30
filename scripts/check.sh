@@ -1,6 +1,6 @@
 #!/bin/bash
-# CVE-2026-31431 Detection Script (Rigorous v1.7.0)
-# Production Ready - Supports x86/ARM, Xinchuang OS, Standard Linux
+# CVE-2026-31431 Detection Script (Rigorous v1.8.0)
+# UI Optimized - Production Ready
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib_common.sh"
@@ -10,33 +10,38 @@ check_deps python3 grep sed awk lsmod uname || exit 1
 # Translations
 declare -A T
 if [[ "$CURRENT_LANG" == "zh" ]]; then
-    T[header]=" CVE-2026-31431 (Copy Fail) 深度安全检测 v1.7.0"
-    T[sys_info]="[*] 系统分析:"
-    T[sec_status]="[*] 安全机制检测:"
-    T[risk_unprivileged]="[!] 风险: 非特权用户可直接访问 AF_ALG 接口"
-    T[perm_denied]="[+] 安全: 非特权用户访问已受限"
-    T[builtin_warning]="[!] 警告: 漏洞组件已内置于内核 (Built-in)"
-    T[final_vulnerable]="结果: 【受影响】需要执行缓解脚本"
-    T[final_low_risk]="结果: 【低风险】接口已受限，但建议应用补丁"
-    T[final_safe]="结果: 【安全】系统不受此漏洞影响"
+    T[header]="CVE-2026-31431 (Copy Fail) 深度安全检测"
+    T[sys_info]="基础环境分析"
+    T[sec_status]="内核与接口安全检测"
+    T[risk_unprivileged]="[!] 风险提示: 非特权用户可直接访问 AF_ALG 接口"
+    T[perm_denied]="[+] 安全确认: 非特权用户访问已受限"
+    T[builtin_warning]="[!] 严重警告: 漏洞组件已编译进内核 (Built-in)，缓解脚本将无效"
+    T[final_vulnerable]="最终结果: 【 受影响 (VULNERABLE) 】"
+    T[final_low_risk]="最终结果: 【 低风险 (LOW RISK) 】"
+    T[final_safe]="最终结果: 【 安全 (SAFE) 】"
+    T[recom_vulnerable]="建议: 立即执行修复脚本 scripts/fix.sh apply"
+    T[recom_low_risk]="建议: 虽然接口已受限，但强烈建议更新内核以彻底修复"
+    T[recom_safe]="说明: 系统当前不受此漏洞威胁"
 else
-    T[header]=" CVE-2026-31431 (Copy Fail) Rigorous Detection v1.7.0"
-    T[sys_info]="[*] System Info:"
-    T[sec_status]="[*] Security Status:"
+    T[header]="CVE-2026-31431 (Copy Fail) Rigorous Detection"
+    T[sys_info]="System Environment Analysis"
+    T[sec_status]="Kernel & Interface Security Check"
     T[risk_unprivileged]="[!] RISK: Unprivileged users can access AF_ALG"
     T[perm_denied]="[+] SAFE: Unprivileged access is restricted"
-    T[builtin_warning]="[!] WARNING: Component is built-in to kernel"
-    T[final_vulnerable]="Result: VULNERABLE - Action Required"
-    T[final_low_risk]="Result: LOW RISK - Interface restricted"
-    T[final_safe]="Result: SAFE"
+    T[builtin_warning]="[!] WARNING: Component is built-in. Mitigation will FAIL."
+    T[final_vulnerable]="Final Result: [ VULNERABLE ]"
+    T[final_low_risk]="Final Result: [ LOW RISK ]"
+    T[final_safe]="Final Result: [ SAFE ]"
+    T[recom_vulnerable]="Action: Run scripts/fix.sh apply immediately"
+    T[recom_low_risk]="Action: Update kernel to address the root cause"
+    T[recom_safe]="Note: System is currently not vulnerable"
 fi
 
-echo "==============================================================="
-echo "${T[header]}"
-echo "==============================================================="
+print_banner
+echo -e "${BOLD}>>> ${T[header]}${NC}\n"
 
 # 1. Info gathering
-log "" "${T[sys_info]}"
+print_step "1/3" "${T[sys_info]}"
 log "" "  - OS: ${OS_NAME}"
 log "" "  - Kernel: $(uname -r)"
 log "" "  - Security: $(check_security_modules)"
@@ -51,31 +56,34 @@ if version_ge "$K_VER" "4.14" && (version_lt "$K_VER" "6.18.22" || ([[ "$K_VER" 
 fi
 
 # 3. Exploitability
-log "" "${T[sec_status]}"
+print_step "2/3" "${T[sec_status]}"
 EFF_STATUS=$(check_unprivileged_crypto)
 if [[ "$EFF_STATUS" == "ACCESSIBLE" ]]; then
-    log "${RED}" "${T[risk_unprivileged]}"
+    log "${RED}" "  ${T[risk_unprivileged]}"
     CAN_EXPLOIT=1
 else
-    log "${GREEN}" "${T[perm_denied]}"
+    log "${GREEN}" "  ${T[perm_denied]}"
     CAN_EXPLOIT=0
 fi
 
-# 4. Built-in
 BUILTIN=0
 if is_builtin "algif_aead"; then
     BUILTIN=1
-    log "${YELLOW}" "${T[builtin_warning]}"
+    log "${YELLOW}" "  ${T[builtin_warning]}"
 fi
 
 # 5. Summary
-echo "---------------------------------------------------------------"
+print_step "3/3" "Summary Report"
+echo -e "${BOLD}---------------------------------------------------------------${NC}"
 if [[ "$VULNERABLE" -eq 0 ]]; then
-    log "${GREEN}" "${T[final_safe]}"
+    log "${GREEN}" "  ${T[final_safe]}"
+    log "" "  ${T[recom_safe]}"
 elif [[ "$CAN_EXPLOIT" -eq 0 ]]; then
-    log "${YELLOW}" "${T[final_low_risk]}"
+    log "${YELLOW}" "  ${T[final_low_risk]}"
+    log "" "  ${T[recom_low_risk]}"
 else
-    log "${RED}" "${T[final_vulnerable]}"
+    log "${RED}" "  ${T[final_vulnerable]}"
+    log "" "  ${T[recom_vulnerable]}"
 fi
-echo "==============================================================="
+echo -e "${BOLD}---------------------------------------------------------------${NC}"
 exit 0

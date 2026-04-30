@@ -10,6 +10,11 @@ BLUE='\033[0;34m'
 NC='\033[0m'
 
 LOG_FILE="/tmp/cve-2026-31431.log"
+# Ensure log file is writable
+if [ -f "$LOG_FILE" ] && [ ! -w "$LOG_FILE" ]; then
+    rm -f "$LOG_FILE" 2>/dev/null
+fi
+touch "$LOG_FILE" 2>/dev/null && chmod 666 "$LOG_FILE" 2>/dev/null
 
 # Language Detection & Override
 [[ "$LANG" == *"zh_CN"* ]] && CURRENT_LANG="zh" || CURRENT_LANG="en"
@@ -31,7 +36,10 @@ function log() {
     local msg=$2
     echo -e "${color}${msg}${NC}"
     # Strip ANSI colors for file log
-    echo -e "$(date '+%Y-%m-%d %H:%M:%S') $msg" | sed 's/\x1b\[[0-9;]*m//g' >> "$LOG_FILE"
+    # Skip logging if we don't have write permission (e.g. running as sub-user)
+    if [ -w "$LOG_FILE" ]; then
+        echo -e "$(date '+%Y-%m-%d %H:%M:%S') $msg" | sed 's/\x1b\[[0-9;]*m//g' >> "$LOG_FILE"
+    fi
 }
 
 # Helper: Check dependencies
@@ -87,14 +95,17 @@ function check_security_modules() {
 
 # Helper: Functional check logic (shared by check and verify)
 function check_unprivileged_crypto() {
+    # Use a more realistic binding string from the exploit to avoid false negatives
     local cmd="import socket; 
 try:
-    s = socket.socket(38, 5, 0)
-    s.bind(('aead', 'aes'))
+    a = socket.socket(38, 5, 0)
+    # This specific complex AEAD binding is common in exploits
+    a.bind(('aead', 'authencesn(hmac(sha256),cbc(aes))'))
     print('ACCESSIBLE')
-except PermissionError:
-    print('PERMISSION_DENIED')
-except Exception:
+except Exception as e:
+    # If the module is blocked, it usually throws OSError/Protocol not supported
+    # If the algorithm is missing, it throws FileNotFoundError
+    # We treat any failure as BLOCKED if it was accessible before
     print('BLOCKED')
 "
     if ! command -v python3 &>/dev/null; then

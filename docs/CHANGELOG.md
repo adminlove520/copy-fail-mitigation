@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.5.0] - 2026-04-30
+
+### Optimized (Based on Exploit Analysis)
+- **Unprivileged Access Check**: The detection script now specifically checks if a **non-privileged user** (e.g., `nobody`) can create AF_ALG sockets. This is the exact initial step required by the exploit.
+- **Broader Mitigation**: The remediation script now also disables `algif_hash` and `algif_skcipher` as a defense-in-depth measure, as complex AEAD algorithms used in exploits often rely on these.
+- **Rigorous Verdict**: Improved the final result logic:
+  - `SAFE`: Kernel version not affected.
+  - `LOW RISK`: Kernel vulnerable but interface restricted (e.g., via existing security policies).
+  - `VULNERABLE`: Direct exploit path confirmed.
+- **Code Hardening**: Replaced `accept()`-only checks with full `socket(38, 5, 0).bind()` tests as seen in the exploit.
+
 ## [1.4.0] - 2026-04-30
 
 ### Optimized

@@ -30,24 +30,32 @@ function is_distro() {
     [[ "$OS_ID" == "$target" || "$OS_ID_LIKE" == *"$target"* ]]
 }
 
-# Helper: Check if AF_ALG AEAD is accessible (Functional Verification)
-# This is a safe way to check if the mitigation is EFFECTIVE
-function check_crypto_accessible() {
-    # Try to use python or perl to check if we can create an AF_ALG socket
-    if command -v python3 &>/dev/null; then
-        python3 -c "import socket; 
+# Helper: Check if AF_ALG AEAD is accessible as unprivileged user
+function check_unprivileged_crypto() {
+    local cmd="import socket; 
 try:
-    s = socket.socket(socket.AF_ALG, socket.SOCK_SEQPACKET, 0)
+    s = socket.socket(38, 5, 0)
     s.bind(('aead', 'aes'))
     print('ACCESSIBLE')
+except PermissionError:
+    print('PERMISSION_DENIED')
 except Exception:
     print('BLOCKED')
-" 2>/dev/null
-    elif command -v perl &>/dev/null; then
-        # Perl fallback
-        perl -e 'use Socket; if (socket(S, 38, 5, 0)) { print "ACCESSIBLE" } else { print "BLOCKED" }' 2>/dev/null
+"
+    if [[ "$EUID" -eq 0 ]] && id nobody &>/dev/null; then
+        # If we are root, test as 'nobody'
+        if command -v python3 &>/dev/null; then
+            su -s /bin/bash nobody -c "python3 -c \"$cmd\"" 2>/dev/null
+        else
+            echo "UNKNOWN"
+        fi
     else
-        echo "UNKNOWN"
+        # Test as current user
+        if command -v python3 &>/dev/null; then
+            python3 -c "$cmd" 2>/dev/null
+        else
+            echo "UNKNOWN"
+        fi
     fi
 }
 function log() {

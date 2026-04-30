@@ -21,8 +21,8 @@ This toolkit provides detection and remediation scripts for **CVE-2026-31431**, 
 
 ## Contents
 
-- `check_cve_2026_31431.sh`: Detection script to check vulnerability status.
-- `fix_cve_2026_31431.sh`: Remediation script to apply mitigation by disabling the affected module.
+- `check_cve_2026_31431.sh`: Detection script to check vulnerability status. Supports **i18n** (auto-detects English/Chinese).
+- `fix_cve_2026_31431.sh`: Remediation script to apply mitigation. Supports **i18n** (auto-detects English/Chinese).
 
 ## Usage
 

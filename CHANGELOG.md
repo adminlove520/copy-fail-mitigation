@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-04-30
+
+### Added
+- **i18n Support**: Added internationalization to both `check_cve_2026_31431.sh` and `fix_cve_2026_31431.sh`. The scripts now automatically detect the system language (`zh_CN` for Chinese, default to English).
+- Updated documentation with i18n instructions.
+
 ## [1.1.0] - 2026-04-30
 
 ### Optimized

@@ -2,6 +2,17 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.0] - 2026-04-30
+
+### Optimized
+- **Project Structure**: Organized files into `scripts/` and `docs/` directories for better maintainability.
+- **Code Refactoring**: Extracted common functions into `scripts/lib_common.sh` to reduce duplication.
+- **Robustness**: 
+  - Added detection for built-in kernel modules.
+  - Improved kernel version parsing.
+  - Added ANSI color stripping for log files.
+- **Documentation**: Simplified README files and renamed advisory files.
+
 ## [1.2.0] - 2026-04-30
 
 ### Added

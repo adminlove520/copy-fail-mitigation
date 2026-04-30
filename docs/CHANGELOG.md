@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2026-04-30
+
+### Added
+- **Manual i18n Override**: Added `--zh` and `--en` command-line flags to all scripts to manually select the interface language.
+- Refined argument parsing in `fix.sh` to handle optional flags alongside positional actions.
+
 ## [1.3.0] - 2026-04-30
 
 ### Optimized

@@ -1,6 +1,6 @@
 #!/bin/bash
 # CVE-2026-31431 Detection Script (Optimized)
-# v1.3.0
+# v1.3.1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib_common.sh"
@@ -8,7 +8,8 @@ source "${SCRIPT_DIR}/lib_common.sh"
 # Translations
 declare -A T
 if [[ "$CURRENT_LANG" == "zh" ]]; then
-    T[header]=" CVE-2026-31431 (Copy Fail) 检测脚本 v1.3"
+    T[header]=" CVE-2026-31431 (Copy Fail) 检测脚本 v1.3.1"
+    T[usage]="用法: $0 [--zh|--en]\n  --zh     : 强制中文界面\n  --en     : 强制英文界面"
     T[log_saved]="日志已保存至: "
     T[sys_info]="[*] 系统信息:"
     T[os]="  - 操作系统: "

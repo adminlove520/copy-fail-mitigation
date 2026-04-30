@@ -22,24 +22,24 @@
 - **多维检测**: 结合内核版本比对与发行版补丁（Backports）特征。
 - **内核内置识别**: 自动检测受影响组件是否已编译进内核（Built-in），防止缓解措施失效。
 - **安全修复**: 执行前进行影响评估，支持一键回滚。
-- **国际化 (i18n)**: 自动识别系统语言（中/英）。
+- **国际化 (i18n)**: 自动识别系统语言（中/英），支持使用 `--zh` 或 `--en` 参数强制指定。
 - **广泛兼容**: 支持 x86/ARM 架构，兼容通用发行版及信创操作系统（麒麟、统信、欧拉等）。
 
 ## 使用指引
 
 ### 1. 运行检测
 ```bash
-bash scripts/check.sh
+bash scripts/check.sh [--zh|--en]
 ```
 
 ### 2. 应用缓解措施 (推荐)
 ```bash
-sudo bash scripts/fix.sh apply
+sudo bash scripts/fix.sh apply [-y] [--zh|--en]
 ```
 
 ### 3. 撤销修复 (回滚)
 ```bash
-sudo bash scripts/fix.sh rollback
+sudo bash scripts/fix.sh rollback [--zh|--en]
 ```
 
 ## 免责声明

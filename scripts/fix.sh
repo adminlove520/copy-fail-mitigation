@@ -1,6 +1,6 @@
 #!/bin/bash
 # CVE-2026-31431 Remediation Script (Optimized)
-# v1.3.0
+# v1.3.1
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib_common.sh"
@@ -10,8 +10,8 @@ CONF_FILE="/etc/modprobe.d/disable-algif-aead.conf"
 # Translations
 declare -A T
 if [[ "$CURRENT_LANG" == "zh" ]]; then
-    T[header]=" CVE-2026-31431 (Copy Fail) 修复脚本 v1.3"
-    T[usage]="用法: $0 [apply|rollback] [-y]\n  apply    : 禁用 algif_aead 模块\n  rollback : 还原配置\n  -y       : 自动确认"
+    T[header]=" CVE-2026-31431 (Copy Fail) 修复脚本 v1.3.1"
+    T[usage]="用法: $0 [apply|rollback] [-y] [--zh|--en]\n  apply    : 禁用 algif_aead 模块\n  rollback : 还原配置\n  -y       : 自动确认\n  --zh|--en: 强制语言界面"
     T[need_root]="错误: 必须以 root 权限运行。"
     T[impact]="[*] 影响评估..."
     T[warn_use]="警告: 模块正在使用 (引用数: "
@@ -36,9 +36,17 @@ fi
 function usage() { echo -e "${T[usage]}"; exit 1; }
 [[ "$EUID" -ne 0 ]] && { log "${RED}" "${T[need_root]}"; exit 1; }
 
-ACTION=${1:-apply}
+ACTION=""
 FORCE=0
-[[ "$*" == *"-y"* ]] && FORCE=1
+for arg in "$@"; do
+    case "$arg" in
+        apply|rollback) ACTION="$arg" ;;
+        -y|--yes) FORCE=1 ;;
+        --zh|--en) ;; # Handled in lib_common.sh
+        *) [[ -z "$ACTION" && "$arg" != -* ]] && ACTION="$arg" ;;
+    esac
+done
+[[ -z "$ACTION" ]] && ACTION="apply"
 
 echo "==============================================================="
 echo "${T[header]}"

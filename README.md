@@ -22,24 +22,24 @@ This toolkit provides tools for detection and remediation of the Linux kernel vu
 - **Robust Detection**: Heuristic kernel version check + distro-specific backport detection.
 - **Built-in Awareness**: Detects if the vulnerable component is compiled into the kernel (making standard module disabling ineffective).
 - **Safe Remediation**: Impact assessment before disabling modules; support for rollback.
-- **i18n**: Automatic English/Chinese language detection.
+- **i18n**: Automatic English/Chinese language detection (Override with `--zh` or `--en`).
 - **Support**: x86/ARM, Standard Linux, and Xinchuang OS (Kylin, UOS, etc.).
 
 ## Usage
 
 ### 1. Detection
 ```bash
-bash scripts/check.sh
+bash scripts/check.sh [--zh|--en]
 ```
 
 ### 2. Mitigation (Apply)
 ```bash
-sudo bash scripts/fix.sh apply
+sudo bash scripts/fix.sh apply [-y] [--zh|--en]
 ```
 
 ### 3. Restore (Rollback)
 ```bash
-sudo bash scripts/fix.sh rollback
+sudo bash scripts/fix.sh rollback [--zh|--en]
 ```
 
 ## License

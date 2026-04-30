@@ -10,8 +10,14 @@ NC='\033[0m'
 
 LOG_FILE="/tmp/cve-2026-31431.log"
 
-# Language Detection
+# Language Detection & Override
 [[ "$LANG" == *"zh_CN"* ]] && CURRENT_LANG="zh" || CURRENT_LANG="en"
+for arg in "$@"; do
+    case "$arg" in
+        --zh) CURRENT_LANG="zh" ;;
+        --en) CURRENT_LANG="en" ;;
+    esac
+done
 
 # Helper: Log messages
 function log() {

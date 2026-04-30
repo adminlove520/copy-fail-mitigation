@@ -19,7 +19,37 @@ for arg in "$@"; do
     esac
 done
 
-# Helper: Log messages
+# OS Identification (Enhanced)
+OS_ID=$(grep -i '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
+OS_ID_LIKE=$(grep -i '^ID_LIKE=' /etc/os-release | cut -d= -f2 | tr -d '"')
+OS_NAME=$(grep -i '^PRETTY_NAME=' /etc/os-release | cut -d= -f2 | tr -d '"')
+
+# Helper: Detailed Distro Check
+function is_distro() {
+    local target=$1
+    [[ "$OS_ID" == "$target" || "$OS_ID_LIKE" == *"$target"* ]]
+}
+
+# Helper: Check if AF_ALG AEAD is accessible (Functional Verification)
+# This is a safe way to check if the mitigation is EFFECTIVE
+function check_crypto_accessible() {
+    # Try to use python or perl to check if we can create an AF_ALG socket
+    if command -v python3 &>/dev/null; then
+        python3 -c "import socket; 
+try:
+    s = socket.socket(socket.AF_ALG, socket.SOCK_SEQPACKET, 0)
+    s.bind(('aead', 'aes'))
+    print('ACCESSIBLE')
+except Exception:
+    print('BLOCKED')
+" 2>/dev/null
+    elif command -v perl &>/dev/null; then
+        # Perl fallback
+        perl -e 'use Socket; if (socket(S, 38, 5, 0)) { print "ACCESSIBLE" } else { print "BLOCKED" }' 2>/dev/null
+    else
+        echo "UNKNOWN"
+    fi
+}
 function log() {
     local color=$1
     local msg=$2

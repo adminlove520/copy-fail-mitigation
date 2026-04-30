@@ -1,6 +1,6 @@
 #!/bin/bash
-# CVE-2026-31431 Detection Script (Optimized)
-# v1.3.1
+# CVE-2026-31431 Detection Script (Enhanced v1.4.0)
+# Supports: x86, ARM, Xinchuang OS, Standard Linux distros
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib_common.sh"
@@ -8,103 +8,79 @@ source "${SCRIPT_DIR}/lib_common.sh"
 # Translations
 declare -A T
 if [[ "$CURRENT_LANG" == "zh" ]]; then
-    T[header]=" CVE-2026-31431 (Copy Fail) 检测脚本 v1.3.1"
-    T[usage]="用法: $0 [--zh|--en]\n  --zh     : 强制中文界面\n  --en     : 强制英文界面"
-    T[log_saved]="日志已保存至: "
-    T[sys_info]="[*] 系统信息:"
-    T[os]="  - 操作系统: "
-    T[arch]="  - 架构: "
-    T[kernel]="  - 内核: "
-    T[sec_status]="[*] 安全状态评估:"
-    T[mitigated]="已缓解 (发现禁用配置)"
-    T[patched]="安全 (检测到发行版补丁)"
-    T[vulnerable]="存在漏洞 (内核版本受影响且模块已加载)"
-    T[pot_vulnerable]="潜在风险 (内核版本受影响，模块未加载)"
-    T[safe]="安全 (内核版本不在受影响范围)"
-    T[builtin]="潜在风险 (模块已编译进内核，禁用措施无效，请尽快升级内核)"
-    T[mod_status]="[*] 模块状态 (algif_aead):"
-    T[loaded]="已加载 (引用计数: "
-    T[not_loaded]="未加载"
-    T[is_builtin]=" (内置于内核)"
-    T[active_users]="  - 活跃用户: "
+    T[header]=" CVE-2026-31431 (Copy Fail) 深度兼容性检测 v1.4.0"
+    T[sys_info]="[*] 系统环境分析:"
+    T[sec_status]="[*] 安全有效性验证:"
+    T[eff_mitigated]="[+] 验证成功: 缓解措施有效 (AF_ALG 接口已阻断)"
+    T[eff_vulnerable]="[!] 验证失败: 接口仍可访问 (缓解措施未生效或未安装)"
+    T[eff_unknown]="[-] 验证中性: 无法进行功能性验证 (缺少 Python/Perl)"
+    T[distro_match]="  - 匹配发行版家族: "
+    T[patch_detected]="[+] 检测到厂商后向移植补丁 (Backport)"
+    T[mitigation_active]="[+] 发现内核模块禁用配置"
 else
-    T[header]=" CVE-2026-31431 (Copy Fail) Detection Script v1.3"
-    T[log_saved]="Log saved to: "
-    T[sys_info]="[*] System Info:"
-    T[os]="  - OS: "
-    T[arch]="  - Arch: "
-    T[kernel]="  - Kernel: "
-    T[sec_status]="[*] Security Status Assessment:"
-    T[mitigated]="MITIGATED (Disabling config active)"
-    T[patched]="SAFE (Distro patch detected)"
-    T[vulnerable]="VULNERABLE (Kernel version affected and module loaded)"
-    T[pot_vulnerable]="POTENTIALLY VULNERABLE (Kernel version affected, module not loaded)"
-    T[safe]="SAFE (Kernel version not in affected range)"
-    T[builtin]="POTENTIALLY VULNERABLE (Module built-in, mitigation won't work, upgrade kernel!)"
-    T[mod_status]="[*] Module Status (algif_aead):"
-    T[loaded]="LOADED (Ref count: "
-    T[not_loaded]="NOT LOADED"
-    T[is_builtin]=" (Built-in)"
-    T[active_users]="  - Active Users: "
+    T[header]=" CVE-2026-31431 (Copy Fail) Enhanced Detection v1.4.0"
+    T[sys_info]="[*] System Environment Analysis:"
+    T[sec_status]="[*] Security Effectiveness Verification:"
+    T[eff_mitigated]="[+] VERIFIED: Mitigation is EFFECTIVE (AF_ALG blocked)"
+    T[eff_vulnerable]="[!] FAILED: Interface still ACCESSIBLE (Mitigation NOT working)"
+    T[eff_unknown]="[-] NEUTRAL: Functional verification skipped (Missing Python/Perl)"
+    T[distro_match]="  - Matched Distro Family: "
+    T[patch_detected]="[+] Vendor backport patch detected"
+    T[mitigation_active]="[+] Kernel module disabling config found"
 fi
 
 echo "==============================================================="
 echo "${T[header]}"
 echo "==============================================================="
-log "" "${T[log_saved]}$LOG_FILE"
-echo "" > "$LOG_FILE"
+log "" "${T[sys_info]}"
+log "" "  - OS: ${OS_NAME}"
+log "" "${T[distro_match]}${OS_ID_LIKE:-$OS_ID}"
+log "" "  - Kernel: $(uname -r)"
 
-# 1. System Info
-OS_ID=$(grep -i '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
-OS_NAME=$(grep -i '^PRETTY_NAME=' /etc/os-release | cut -d= -f2 | tr -d '"')
-ARCH=$(uname -m)
-KERNEL=$(uname -r)
-
-log "${BLUE}" "${T[sys_info]}"
-log "" "${T[os]}${OS_NAME}"
-log "" "${T[arch]}${ARCH}"
-log "" "${T[kernel]}${KERNEL}"
-
-# 2. Heuristics
-VULNERABLE=0
-K_VER=$(echo $KERNEL | grep -oP '^\d+\.\d+\.\d+' | head -n1)
-[[ -z "$K_VER" ]] && K_VER=$(echo $KERNEL | cut -d'-' -f1)
-
-if version_ge "$K_VER" "4.14"; then
-    if version_lt "$K_VER" "6.18.22"; then VULNERABLE=1;
-    elif [[ "$K_VER" == 6.19* ]] && version_lt "$K_VER" "6.19.12"; then VULNERABLE=1; fi
+# 1. Backport Patch Detection (Enhanced for Xinchuang)
+PATCHED=0
+log "" "[*] Checking for vendor patches..."
+if is_distro "ubuntu") && dpkg -l linux-image-$(uname -r) 2>/dev/null | grep -qE "6.8.0-40|5.15.0-110"; then
+    PATCHED=1
+elif is_distro "fedora" || is_distro "rhel"; then
+    if rpm -q kernel-$(uname -r) --changelog 2>/dev/null | grep -qi "CVE-2026-31431"; then
+        PATCHED=1
+    fi
+elif [[ "$OS_ID" =~ (kylin|uos|openEuler|anolis) ]]; then
+    # Specific Xinchuang checks
+    if command -v nkvers &>/dev/null && nkvers | grep -qi "CVE-2026-31431"; then PATCHED=1; fi
+    if rpm -q kernel --changelog 2>/dev/null | grep -qi "CVE-2026-31431"; then PATCHED=1; fi
 fi
 
-# 3. Patch Check
-PATCHED=0
-if [[ "$OS_ID" == "ubuntu" ]] && dpkg -l linux-image-$(uname -r) 2>/dev/null | grep -q "6.8.0-40"; then PATCHED=1;
-elif [[ "$OS_ID" =~ (rhel|centos|rocky|kylin|uos) ]] && rpm -q kernel-$(uname -r) --changelog 2>/dev/null | grep -qi "CVE-2026-31431"; then PATCHED=1; fi
+[[ "$PATCHED" -eq 1 ]] && log "${GREEN}" "${T[patch_detected]}"
 
-# 4. Mitigation/Built-in Check
+# 2. Mitigation Config Check
 MITIGATED=0
-[[ -f "/etc/modprobe.d/disable-algif-aead.conf" ]] && grep -q "install algif_aead /bin/false" /etc/modprobe.d/disable-algif-aead.conf && MITIGATED=1
+if [[ -f "/etc/modprobe.d/disable-algif-aead.conf" ]] && grep -q "install algif_aead /bin/false" /etc/modprobe.d/disable-algif-aead.conf; then
+    MITIGATED=1
+    log "${GREEN}" "${T[mitigation_active]}"
+fi
 
-BUILTIN=0
-is_builtin "algif_aead" && BUILTIN=1
+# 3. Functional Verification (The REAL Test)
+log "" "${T[sec_status]}"
+EFF_STATUS=$(check_crypto_accessible)
 
-# 5. Result
-log "\n${BLUE}" "${T[sec_status]}"
-if [ "$PATCHED" -eq 1 ]; then log "${GREEN}" "  - Status: ${T[patched]}"
-elif [ "$MITIGATED" -eq 1 ]; then log "${GREEN}" "  - Status: ${T[mitigated]}"
-elif [ "$VULNERABLE" -eq 1 ]; then
-    if lsmod | grep -q "^algif_aead"; then log "${RED}" "  - Status: ${T[vulnerable]}"
-    elif [ "$BUILTIN" -eq 1 ]; then log "${RED}" "  - Status: ${T[builtin]}"
-    else log "${YELLOW}" "  - Status: ${T[pot_vulnerable]}"; fi
-else log "${GREEN}" "  - Status: ${T[safe]}"; fi
+if [[ "$EFF_STATUS" == "BLOCKED" ]]; then
+    log "${GREEN}" "${T[eff_mitigated]}"
+    FINAL_RESULT="SAFE"
+elif [[ "$EFF_STATUS" == "ACCESSIBLE" ]]; then
+    if [[ "$PATCHED" -eq 1 ]]; then
+        log "${YELLOW}" "[-] Note: Patch detected but interface still accessible (expected for patches as they fix logic, not block access)"
+        FINAL_RESULT="PATCHED"
+    else
+        log "${RED}" "${T[eff_vulnerable]}"
+        FINAL_RESULT="VULNERABLE"
+    fi
+else
+    log "${YELLOW}" "${T[eff_unknown]}"
+    FINAL_RESULT="UNDETERMINED"
+fi
 
-# 6. Module Details
-log "\n${BLUE}" "${T[mod_status]}"
-if lsmod | grep -q "^algif_aead"; then
-    REF_COUNT=$(lsmod | grep "^algif_aead" | awk '{print $3}')
-    log "" "  - ${T[loaded]}${REF_COUNT})"
-    USERS=$(lsof 2>/dev/null | grep AF_ALG | awk '{print $1}' | sort -u | xargs)
-    [[ -n "$USERS" ]] && log "" "${T[active_users]}$USERS"
-elif [ "$BUILTIN" -eq 1 ]; then log "" "  - Status: ${T[is_builtin]}"
-else log "" "  - Status: ${T[not_loaded]}"; fi
-
+echo "---------------------------------------------------------------"
+log "" "Final Result: $FINAL_RESULT"
 exit 0

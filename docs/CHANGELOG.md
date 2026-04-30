@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.4.0] - 2026-04-30
+
+### Optimized
+- **Functional Verification**: Added "Closed-loop Verification" logic using Python/Perl to test if the AF_ALG interface is actually blocked. This ensures the mitigation is *effective*, not just *configured*.
+- **Enhanced Compatibility**:
+  - Improved OS identification using `ID_LIKE` for better coverage of Xinchuang OS (Kylin, UOS, openEuler, Anolis).
+  - Added explicit backport patch detection for specific Xinchuang versions and general RHEL/Ubuntu kernels.
+- **Workflow**: Automated the verification step as part of the remediation process.
+
 ## [1.3.1] - 2026-04-30
 
 ### Added

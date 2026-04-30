@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.7.0] - 2026-04-30
+
+### Optimized (Production Ready)
+- **Security & Reliability**:
+  - Implemented `trap` in `verify_active.sh` for guaranteed cleanup of temporary users and scripts even if interrupted.
+  - Switched to `mktemp` for safer temporary file handling.
+  - Added comprehensive dependency checks (`check_deps`) for all required system binaries.
+- **Enhanced Visibility**:
+  - Added detection of active security modules (SELinux/AppArmor) to provide context on why an exploit might be blocked despite a vulnerable kernel.
+  - Improved logging with ANSI color stripping for file-based logs.
+- **Code Refactoring**:
+  - Centralized OS identification and functional crypto checking in `lib_common.sh`.
+  - Standardized versioning and headers across all scripts.
+- **Exploit Analysis Update**: Optimized socket probing logic to match the exact sequence found in real-world exploits.
+
 ## [1.6.0] - 2026-04-30
 
 ### Added

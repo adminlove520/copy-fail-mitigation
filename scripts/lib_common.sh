@@ -1,5 +1,6 @@
 #!/bin/bash
 # Common Library for CVE-2026-31431 Mitigation Scripts
+# v1.7.0 - Production Ready
 
 # Colors
 RED='\033[0;31m'
@@ -19,92 +20,34 @@ for arg in "$@"; do
     esac
 done
 
-# OS Identification (Enhanced)
+# OS Identification
 OS_ID=$(grep -i '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
 OS_ID_LIKE=$(grep -i '^ID_LIKE=' /etc/os-release | cut -d= -f2 | tr -d '"')
 OS_NAME=$(grep -i '^PRETTY_NAME=' /etc/os-release | cut -d= -f2 | tr -d '"')
 
-# Helper: Active Exploit Verification with Temp User
-function run_active_test() {
-    local test_user="cve_verify_tmp"
-    local test_script="/tmp/cve_test.py"
-    local result="FAILED"
-
-    # 1. Create a non-privileged test user
-    if ! id "$test_user" &>/dev/null; then
-        useradd -m "$test_user" &>/dev/null
-    fi
-
-    # 2. Prepare a non-destructive exploit test script
-    # This script tries the exact socket/bind/accept sequence from the exploit
-    cat <<EOF > "$test_script"
-import socket, sys
-try:
-    a = socket.socket(38, 5, 0)
-    # Try the specific exploit binding
-    a.bind(("aead", "authencesn(hmac(sha256),cbc(aes))"))
-    # If we reach here, the interface is accessible
-    print("INTERFACE_ACCESSIBLE")
-except Exception as e:
-    print(f"BLOCKED")
-EOF
-    chmod 644 "$test_script"
-
-    # 3. Run as temp user
-    if command -v python3 &>/dev/null; then
-        res=$(su - "$test_user" -c "python3 $test_script" 2>/dev/null)
-        if [[ "$res" == *"INTERFACE_ACCESSIBLE"* ]]; then
-            result="VULNERABLE"
-        else
-            result="SAFE"
-        fi
-    fi
-
-    # 4. Cleanup
-    rm -f "$test_script"
-    userdel -r "$test_user" &>/dev/null
-    
-    echo "$result"
-}
-function is_distro() {
-    local target=$1
-    [[ "$OS_ID" == "$target" || "$OS_ID_LIKE" == *"$target"* ]]
-}
-
-# Helper: Check if AF_ALG AEAD is accessible as unprivileged user
-function check_unprivileged_crypto() {
-    local cmd="import socket; 
-try:
-    s = socket.socket(38, 5, 0)
-    s.bind(('aead', 'aes'))
-    print('ACCESSIBLE')
-except PermissionError:
-    print('PERMISSION_DENIED')
-except Exception:
-    print('BLOCKED')
-"
-    if [[ "$EUID" -eq 0 ]] && id nobody &>/dev/null; then
-        # If we are root, test as 'nobody'
-        if command -v python3 &>/dev/null; then
-            su -s /bin/bash nobody -c "python3 -c \"$cmd\"" 2>/dev/null
-        else
-            echo "UNKNOWN"
-        fi
-    else
-        # Test as current user
-        if command -v python3 &>/dev/null; then
-            python3 -c "$cmd" 2>/dev/null
-        else
-            echo "UNKNOWN"
-        fi
-    fi
-}
+# Helper: Log messages
 function log() {
     local color=$1
     local msg=$2
     echo -e "${color}${msg}${NC}"
     # Strip ANSI colors for file log
     echo -e "$(date '+%Y-%m-%d %H:%M:%S') $msg" | sed 's/\x1b\[[0-9;]*m//g' >> "$LOG_FILE"
+}
+
+# Helper: Check dependencies
+function check_deps() {
+    local deps=("$@")
+    local missing=()
+    for dep in "${deps[@]}"; do
+        if ! command -v "$dep" &>/dev/null; then
+            missing+=("$dep")
+        fi
+    done
+    if [ ${#missing[@]} -ne 0 ]; then
+        log "${RED}" "Missing required commands: ${missing[*]}"
+        return 1
+    fi
+    return 0
 }
 
 # Helper: Version comparison
@@ -116,17 +59,55 @@ function version_lt() {
     [ "$(printf '%s\n' "$1" "$2" | sort -V | head -n1)" == "$1" ] && [ "$1" != "$2" ]
 }
 
-# Heuristic: Check if module is built-in
+# Helper: Check if module is built-in
 function is_builtin() {
     local module=$1
     if [ -f "/lib/modules/$(uname -r)/modules.builtin" ]; then
-        grep -q "${module}.ko" "/lib/modules/$(uname -r)/modules.builtin"
-        return $?
+        grep -q "${module}.ko" "/lib/modules/$(uname -r)/modules.builtin" && return 0
     fi
-    # Fallback to checking kconfig if available
     if [ -f "/boot/config-$(uname -r)" ]; then
-        grep -q "CONFIG_CRYPTO_USER_API_AEAD=y" "/boot/config-$(uname -r)"
-        return $?
+        grep -q "CONFIG_CRYPTO_USER_API_AEAD=y" "/boot/config-$(uname -r)" && return 0
     fi
     return 1
+}
+
+# Helper: Check security status (SELinux/AppArmor)
+function check_security_modules() {
+    local status=""
+    if command -v sestatus &>/dev/null; then
+        status+="SELinux: $(sestatus | grep 'SELinux status' | awk '{print $3}') "
+    fi
+    if command -v aa-status &>/dev/null; then
+        status+="AppArmor: Loaded "
+    elif [ -d /sys/kernel/security/apparmor ]; then
+        status+="AppArmor: Enabled "
+    fi
+    echo "${status:-None}"
+}
+
+# Helper: Functional check logic (shared by check and verify)
+function check_unprivileged_crypto() {
+    local cmd="import socket; 
+try:
+    s = socket.socket(38, 5, 0)
+    s.bind(('aead', 'aes'))
+    print('ACCESSIBLE')
+except PermissionError:
+    print('PERMISSION_DENIED')
+except Exception:
+    print('BLOCKED')
+"
+    if ! command -v python3 &>/dev/null; then
+        echo "UNKNOWN"
+        return
+    fi
+
+    if [[ "$EUID" -eq 0 ]]; then
+        # Try as 'nobody' if root
+        local target_user="nobody"
+        id "$target_user" &>/dev/null || target_user="root" # Fallback if nobody doesn't exist (rare)
+        su -s /bin/bash "$target_user" -c "python3 -c \"$cmd\"" 2>/dev/null
+    else
+        python3 -c "$cmd" 2>/dev/null
+    fi
 }

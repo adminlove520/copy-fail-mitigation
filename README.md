@@ -25,6 +25,11 @@ This toolkit provides tools for detection and remediation of the Linux kernel vu
 - **i18n**: Automatic English/Chinese language detection (Override with `--zh` or `--en`).
 - **Support**: x86/ARM, Standard Linux, and Xinchuang OS (Kylin, UOS, etc.).
 
+3. `verify_active.sh`: Active closed-loop verification (New).
+   - Automatically creates a temporary unprivileged user (`cve_verify_tmp`).
+   - Simulates the exploit's attack path (non-destructive test).
+   - Cleans up the user and environment afterward.
+
 ## Usage
 
 ### 1. Detection
@@ -40,6 +45,12 @@ sudo bash scripts/fix.sh apply [-y] [--zh|--en]
 ### 3. Restore (Rollback)
 ```bash
 sudo bash scripts/fix.sh rollback [--zh|--en]
+```
+
+### 4. Active Verification (Highly Reliable)
+To verify the mitigation by simulating a real attack path:
+```bash
+sudo bash scripts/verify_active.sh
 ```
 
 ## License

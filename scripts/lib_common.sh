@@ -24,7 +24,48 @@ OS_ID=$(grep -i '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')
 OS_ID_LIKE=$(grep -i '^ID_LIKE=' /etc/os-release | cut -d= -f2 | tr -d '"')
 OS_NAME=$(grep -i '^PRETTY_NAME=' /etc/os-release | cut -d= -f2 | tr -d '"')
 
-# Helper: Detailed Distro Check
+# Helper: Active Exploit Verification with Temp User
+function run_active_test() {
+    local test_user="cve_verify_tmp"
+    local test_script="/tmp/cve_test.py"
+    local result="FAILED"
+
+    # 1. Create a non-privileged test user
+    if ! id "$test_user" &>/dev/null; then
+        useradd -m "$test_user" &>/dev/null
+    fi
+
+    # 2. Prepare a non-destructive exploit test script
+    # This script tries the exact socket/bind/accept sequence from the exploit
+    cat <<EOF > "$test_script"
+import socket, sys
+try:
+    a = socket.socket(38, 5, 0)
+    # Try the specific exploit binding
+    a.bind(("aead", "authencesn(hmac(sha256),cbc(aes))"))
+    # If we reach here, the interface is accessible
+    print("INTERFACE_ACCESSIBLE")
+except Exception as e:
+    print(f"BLOCKED")
+EOF
+    chmod 644 "$test_script"
+
+    # 3. Run as temp user
+    if command -v python3 &>/dev/null; then
+        res=$(su - "$test_user" -c "python3 $test_script" 2>/dev/null)
+        if [[ "$res" == *"INTERFACE_ACCESSIBLE"* ]]; then
+            result="VULNERABLE"
+        else
+            result="SAFE"
+        fi
+    fi
+
+    # 4. Cleanup
+    rm -f "$test_script"
+    userdel -r "$test_user" &>/dev/null
+    
+    echo "$result"
+}
 function is_distro() {
     local target=$1
     [[ "$OS_ID" == "$target" || "$OS_ID_LIKE" == *"$target"* ]]

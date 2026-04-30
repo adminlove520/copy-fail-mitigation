@@ -2,6 +2,15 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.6.0] - 2026-04-30
+
+### Added
+- **Active Verification Script (`verify_active.sh`)**: Implemented an automated end-to-end verification tool.
+  - Creates a temporary user (`cve_verify_tmp`).
+  - Executes a non-destructive version of the AF_ALG exploit path (targeting the exact socket/bind used in real exploits).
+  - Automatically cleans up the temporary user account and home directory.
+- Updated `lib_common.sh` with `run_active_test` helper.
+
 ## [1.5.0] - 2026-04-30
 
 ### Optimized (Based on Exploit Analysis)

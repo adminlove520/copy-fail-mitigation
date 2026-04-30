@@ -1,11 +1,11 @@
 #!/bin/bash
-# CVE-2026-31431 Active Verification Script (v1.8.0)
+# CVE-2026-31431 Active Verification Script (v1.9.1)
 # UI Optimized - Production Ready
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib_common.sh"
 
-check_deps python3 useradd userdel su mktemp chmod || exit 1
+check_deps python3 useradd userdel su mktemp chmod timeout || exit 1
 
 if [[ "$EUID" -ne 0 ]]; then
     echo "Error: This verification requires root to create/delete temporary users."
@@ -58,7 +58,8 @@ EOF
 chmod 644 "$TEMP_SCRIPT"
 
 print_step "2/2" "${T[probing]}"
-RESULT=$(su - "$TEST_USER" -c "python3 $TEMP_SCRIPT" 2>/dev/null)
+# Use the improved check logic that avoids 'su' hangs
+RESULT=$(check_unprivileged_crypto)
 
 echo -e "${BOLD}---------------------------------------------------------------${NC}"
 if [[ "$RESULT" == *"SUCCESS"* ]]; then

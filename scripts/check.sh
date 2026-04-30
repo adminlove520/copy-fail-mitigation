@@ -1,5 +1,5 @@
 #!/bin/bash
-# CVE-2026-31431 Detection Script (Rigorous v1.8.0)
+# CVE-2026-31431 Detection Script (Rigorous v1.9.1)
 # UI Optimized - Production Ready
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

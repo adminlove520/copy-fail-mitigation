@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.9.1] - 2026-04-30
+
+### Fixed
+- **Hanging Issue**: Fixed a critical bug where `check.sh` and `fix.sh` could hang during security checks on certain systems (e.g., Ubuntu 24.04). Replaced external `su`/`runuser` calls with an internal Python-based privilege dropping mechanism.
+- **Improved Stability**: Added `timeout` to all external security commands and unified the unprivileged crypto check logic.
+
+## [1.9.0] - 2026-04-30
+
+### Optimized (Security & Reliability)
+- **Robust Verification**: Improved the functional check logic to handle permission errors and kernel hangs more gracefully.
+- **Log Management**: Standardized log file creation and permission handling across all scripts.
+
 ## [1.8.0] - 2026-04-30
 
 ### Optimized (UI & UX)

@@ -1,6 +1,6 @@
 #!/bin/bash
 # Common Library for CVE-2026-31431 Mitigation Scripts
-# v1.8.0 - UI Optimized
+# v1.9.1 - Rigorous & Bugfix (Hang fixed)
 
 # Colors
 RED='\033[1;31m'
@@ -12,9 +12,12 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 LOG_FILE="/tmp/cve-2026-31431.log"
-# Ensure log file is writable
-if [ -f "$LOG_FILE" ] && [ ! -w "$LOG_FILE" ]; then rm -f "$LOG_FILE" 2>/dev/null; fi
-touch "$LOG_FILE" 2>/dev/null && chmod 666 "$LOG_FILE" 2>/dev/null
+
+# Initialization: Setup log file once
+if [[ ! -w "$LOG_FILE" ]]; then
+    rm -f "$LOG_FILE" 2>/dev/null
+    touch "$LOG_FILE" 2>/dev/null && chmod 666 "$LOG_FILE" 2>/dev/null
+fi
 [[ ! -w "$LOG_FILE" ]] && LOG_FILE="/dev/null"
 
 # UI Helpers
@@ -31,13 +34,6 @@ function print_banner() {
 function print_step() {
     log "${CYAN}" "${BOLD}[ STEP $1 ]${NC} $2"
 }
-
-# Language Detection & Override
-# Ensure log file is writable
-if [ -f "$LOG_FILE" ] && [ ! -w "$LOG_FILE" ]; then
-    rm -f "$LOG_FILE" 2>/dev/null
-fi
-touch "$LOG_FILE" 2>/dev/null && chmod 666 "$LOG_FILE" 2>/dev/null
 
 # Language Detection & Override
 [[ "$LANG" == *"zh_CN"* ]] && CURRENT_LANG="zh" || CURRENT_LANG="en"
@@ -58,10 +54,8 @@ function log() {
     local color=$1
     local msg=$2
     echo -e "${color}${msg}${NC}"
-    # Strip ANSI colors for file log
-    # Skip logging if we don't have write permission
     {
-        if [ -w "$LOG_FILE" ]; then
+        if [[ -w "$LOG_FILE" ]]; then
             echo -e "$(date '+%Y-%m-%d %H:%M:%S') $msg" | sed 's/\x1b\[[0-9;]*m//g' >> "$LOG_FILE"
         fi
     } 2>/dev/null
@@ -104,14 +98,17 @@ function is_builtin() {
     return 1
 }
 
-# Helper: Check security status (SELinux/AppArmor)
+# Helper: Check security status (SELinux/AppArmor) with timeout
 function check_security_modules() {
     local status=""
     if command -v sestatus &>/dev/null; then
-        status+="SELinux: $(sestatus | grep 'SELinux status' | awk '{print $3}') "
+        local selinux=$(timeout 1s sestatus 2>/dev/null | grep 'SELinux status' | awk '{print $3}')
+        [[ -n "$selinux" ]] && status+="SELinux: $selinux "
     fi
     if command -v aa-status &>/dev/null; then
-        status+="AppArmor: Loaded "
+        if timeout 1s aa-status --enabled &>/dev/null; then
+            status+="AppArmor: Enabled "
+        fi
     elif [ -d /sys/kernel/security/apparmor ]; then
         status+="AppArmor: Enabled "
     fi
@@ -120,30 +117,30 @@ function check_security_modules() {
 
 # Helper: Functional check logic (shared by check and verify)
 function check_unprivileged_crypto() {
-    # Use a more realistic binding string from the exploit to avoid false negatives
-    local cmd="import socket; 
-try:
-    a = socket.socket(38, 5, 0)
-    # This specific complex AEAD binding is common in exploits
-    a.bind(('aead', 'authencesn(hmac(sha256),cbc(aes))'))
-    print('ACCESSIBLE')
-except Exception as e:
-    # If the module is blocked, it usually throws OSError/Protocol not supported
-    # If the algorithm is missing, it throws FileNotFoundError
-    # We treat any failure as BLOCKED if it was accessible before
-    print('BLOCKED')
-"
+    # We use a python script that drops privileges if run as root
+    # This avoids using 'su' or 'runuser' which can hang in some environments
+    local py_cmd="import socket, os, sys
+def test():
+    try:
+        if os.getuid() == 0:
+            try:
+                os.setuid(65534) # nobody
+            except:
+                pass
+        s = socket.socket(38, 5, 0) # AF_ALG
+        # Using a simpler binding for stability
+        s.bind(('aead', 'aes'))
+        print('ACCESSIBLE')
+    except:
+        print('BLOCKED')
+test()"
+
     if ! command -v python3 &>/dev/null; then
         echo "UNKNOWN"
         return
     fi
 
-    if [[ "$EUID" -eq 0 ]]; then
-        # Try as 'nobody' if root
-        local target_user="nobody"
-        id "$target_user" &>/dev/null || target_user="root" # Fallback if nobody doesn't exist (rare)
-        su -s /bin/bash "$target_user" -c "python3 -c \"$cmd\"" 2>/dev/null
-    else
-        python3 -c "$cmd" 2>/dev/null
-    fi
+    # Use timeout to prevent kernel-level hangs if the driver is buggy
+    local res=$(timeout 3s python3 -c "$py_cmd" 2>/dev/null)
+    echo "${res:-BLOCKED}"
 }

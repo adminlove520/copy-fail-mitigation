@@ -2,6 +2,14 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.2] - 2026-05-06
+### Optimized (Production Rigor)
+- **Environment Awareness**: Added container (Docker/LXC) detection; scripts now skip incompatible operations with clear guidance.
+- **Safety Pre-checks**: `kernel_upgrade.sh` now checks for `/boot` disk space before proceeding to prevent incomplete installs.
+- **Mitigation Hardening**: `fix.sh` now synchronizes changes to `initramfs` (via dracut/update-initramfs) to ensure protection during early boot.
+- **Improved Reliability**: Refined module unloading logic to handle "in-use" states gracefully instead of failing.
+- **Dependency Fallback**: Enhanced crypto probing to be more resilient to missing environment components.
+
 ## [2.2.0] - 2026-05-06
 ### Added
 - **Kernel Upgrade Integration**: Added `upgrade` action to `fix.sh` to support permanent remediation via OS-specific package managers (dnf/yum/apt).

@@ -1,98 +1,87 @@
 #!/bin/bash
 # CVE-2026-31431 Mitigation Script (Module Blocklist)
-# v2.2.1 - Focused on Mitigation only
+# v2.2.2 - Production-grade Mitigation
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib_common.sh"
 
 check_deps python3 modprobe lsmod rm cat || exit 1
 
-CONF_FILE="/etc/modprobe.d/disable-algif-aead.conf"
+[[ "$EUID" -ne 0 ]] && { log "${RED}" "Error: Must run as root."; exit 1; }
 
 # Translations
 declare -A T
 if [[ "$CURRENT_LANG" == "zh" ]]; then
     T[header]="CVE-2026-31431 (Copy Fail) 漏洞缓解 (模块阻断)"
-    T[usage]="用法: $0 [apply|rollback] [-y]\n  apply    : 应用缓解措施 (禁用内核模块)\n  rollback : 还原系统配置"
-    T[root_err]="错误: 必须以 root 权限运行。"
-    T[mitigating]="[*] 正在应用内核模块级阻断规则..."
-    T[unloading]="[*] 正在尝试卸载受影响的内核模块..."
-    T[verifying]="[*] 执行有效性闭环验证..."
-    T[success]="[+] 缓解成功: 漏洞探测已被阻断。"
-    T[partial]="[!] 缓解受限: 接口仍可访问。检测到模块内置或正在使用，建议使用 scripts/kernel_upgrade.sh 进行升级。"
-    T[rollback_done]="[+] 配置已还原。"
+    T[container_skip]="[!] 检测到容器环境，跳过内核模块操作。"
+    T[mitigating]="[*] 正在应用内核模块级阻断规则并更新配置..."
+    T[in_use]="[!] 警告: 模块 %s 正在被使用，无法立即卸载，但阻断规则已生效。"
+    T[initramfs]="[*] 正在同步更新 initramfs (此操作可能需要几分钟)..."
+    T[success]="[+] 缓解成功: 探测已被阻断。建议重启以确保 initramfs 加载新规则。"
 else
     T[header]="CVE-2026-31431 (Copy Fail) Mitigation (Module Blocklist)"
-    T[usage]="Usage: $0 [apply|rollback] [-y]\n  apply    : Apply mitigation (Disable modules)\n  rollback : Restore configuration"
-    T[root_err]="Error: Must run as root."
-    T[mitigating]="[*] Applying kernel module blocklist..."
-    T[unloading]="[*] Attempting to unload affected modules..."
-    T[verifying]="[*] Performing closed-loop verification..."
-    T[success]="[+] SUCCESS: Exploit path is now blocked."
-    T[partial]="[!] LIMITED: Interface still accessible. Built-in detected or in-use. Use scripts/kernel_upgrade.sh instead."
-    T[rollback_done]="[+] Configuration restored."
+    T[container_skip]="[!] Container detected. Skipping kernel module operations."
+    T[mitigating]="[*] Applying module blocklist and updating configuration..."
+    T[in_use]="[!] WARNING: Module %s is in use and cannot be unloaded. Blocklist will apply on next load."
+    T[initramfs]="[*] Updating initramfs (this may take a few minutes)..."
+    T[success]="[+] SUCCESS: Exploit path blocked. Reboot recommended to apply initramfs changes."
 fi
-
-[[ "$EUID" -ne 0 ]] && { log "${RED}" "${T[root_err]}"; exit 1; }
-
-ACTION=${1:-apply}
-[[ "$ACTION" == "-"* ]] && ACTION="apply"
-FORCE=0
-[[ "$*" == *"-y"* ]] && FORCE=1
-
-function usage() {
-    echo -e "${T[usage]}"
-    exit 1
-}
-
-function do_apply() {
-    print_step "MITIGATE" "${T[mitigating]}"
-    cat <<EOF > "$CONF_FILE"
-# Mitigation for CVE-2026-31431
-install algif_aead /bin/false
-install algif_hash /bin/false
-install algif_skcipher /bin/false
-EOF
-    for mod in algif_aead algif_hash algif_skcipher; do
-        modprobe -r "$mod" 2>/dev/null
-    done
-    echo 1 > /proc/sys/vm/drop_caches
-    
-    do_verify
-}
-
-function do_verify() {
-    print_step "VERIFY" "${T[verifying]}"
-    PROBE_RAW=$(check_unprivileged_crypto)
-    ACCESSIBLE_COUNT=0
-    IFS='|' read -ra ADDR <<< "$PROBE_RAW"
-    for i in "${ADDR[@]}"; do
-        IFS=':' read -ra VAL <<< "$i"
-        [[ "${VAL[1]}" == "OK" ]] && ((ACCESSIBLE_COUNT++))
-    done
-
-    echo -e "${BOLD}---------------------------------------------------------------${NC}"
-    if [[ $ACCESSIBLE_COUNT -eq 0 ]]; then
-        log "${GREEN}" "  ${T[success]}"
-    else
-        log "${RED}" "  ${T[partial]}"
-        is_builtin "algif_aead" && log "${RED}" "  [!] Built-in detected. Modprobe mitigation is NOT effective."
-    fi
-    echo -e "${BOLD}---------------------------------------------------------------${NC}"
-}
 
 print_banner
 echo -e "${BOLD}>>> ${T[header]}${NC}\n"
 
-case "$ACTION" in
-    apply)
-        do_apply
-        ;;
-    rollback)
-        rm -f "$CONF_FILE"
-        log "${GREEN}" "${T[rollback_done]}"
-        ;;
-    *) usage ;;
-esac
+if is_container; then
+    log "${YELLOW}" "${T[container_skip]}"
+    exit 0
+fi
 
-exit 0
+CONF_FILE="/etc/modprobe.d/disable-algif-aead.conf"
+
+function do_apply() {
+    print_step "1/3" "${T[mitigating]}"
+    cat <<EOF > "$CONF_FILE"
+# Mitigation for CVE-2026-31431
+blacklist algif_aead
+blacklist algif_hash
+blacklist algif_skcipher
+install algif_aead /bin/false
+install algif_hash /bin/false
+install algif_skcipher /bin/false
+EOF
+
+    for mod in algif_aead algif_hash algif_skcipher; do
+        if lsmod | grep -q "^${mod}"; then
+            if ! modprobe -r "$mod" 2>/dev/null; then
+                printf "${YELLOW}${T[in_use]}${NC}\n" "$mod"
+            fi
+        fi
+    done
+
+    # Update initramfs to ensure the blocklist is active early in the boot process
+    print_step "2/3" "${T[initramfs]}"
+    if command -v update-initramfs &>/dev/null; then
+        update-initramfs -u 2>/dev/null
+    elif command -v dracut &>/dev/null; then
+        dracut -f --nocompress 2>/dev/null
+    fi
+
+    print_step "3/3" "Verification"
+    PROBE_RAW=$(check_unprivileged_crypto)
+    echo -e "${BOLD}---------------------------------------------------------------${NC}"
+    if [[ "$PROBE_RAW" == *"OK"* ]]; then
+        log "${RED}" "  [!] Mitigation partial. System reboot is MANDATORY."
+    else
+        log "${GREEN}" "  ${T[success]}"
+    fi
+    echo -e "${BOLD}---------------------------------------------------------------${NC}"
+}
+
+ACTION=${1:-apply}
+case "$ACTION" in
+    apply) do_apply ;;
+    rollback) 
+        rm -f "$CONF_FILE"
+        log "${GREEN}" "[+] Configuration restored. Reboot to restore modules." 
+        ;;
+    *) echo "Usage: $0 [apply|rollback]"; exit 1 ;;
+esac

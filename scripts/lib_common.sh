@@ -141,15 +141,33 @@ function check_security_modules() {
     echo "${status:-None}"
 }
 
-# Helper: Python Probe Source
+# Environment Checks
+function is_container() {
+    [ -f /.dockerenv ] && return 0
+    grep -qE "docker|lxc|containerd" /proc/1/cgroup 2>/dev/null && return 0
+    return 1
+}
+
+# Helper: Check disk space for kernel upgrade (requires ~200MB in /boot)
+function check_boot_space() {
+    local boot_space=$(df -m /boot | tail -1 | awk '{print $4}')
+    if [ "$boot_space" -lt 200 ]; then
+        log "${RED}" "Error: Insufficient space in /boot (found ${boot_space}MB, need >200MB)."
+        return 1
+    fi
+    return 0
+}
+
+# Helper: Python Probe Source (Optimized for error handling)
 PY_PROBE_SRC="import socket, os, sys
 def probe(ctype, alg):
     try:
         s = socket.socket(38, 5, 0)
-        s.settimeout(1)
+        s.settimeout(2)
         s.bind((ctype, alg))
         return 'OK'
-    except: return 'ERR'
+    except PermissionError: return 'PERM'
+    except Exception: return 'ERR'
 
 if os.getuid() == 0:
     try: os.setuid(65534)

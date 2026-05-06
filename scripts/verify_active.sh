@@ -60,8 +60,16 @@ for i in "${ADDR[@]}"; do
     fi
 done
 
+# Check for vendor patch as priority
+HAS_PATCH=0
+if check_vendor_patch; then
+    HAS_PATCH=1
+fi
+
 echo -e "${BOLD}---------------------------------------------------------------${NC}"
-if [[ $ACCESSIBLE_COUNT -gt 0 ]]; then
+if [[ "$HAS_PATCH" -eq 1 ]]; then
+    log "${GREEN}" "  ${T[safe]} (Vendor Patch Verified)"
+elif [[ $ACCESSIBLE_COUNT -gt 0 ]]; then
     log "${RED}" "  ${T[vulnerable]}"
 else
     log "${GREEN}" "  ${T[safe]}"

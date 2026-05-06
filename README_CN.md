@@ -25,7 +25,8 @@
 - **内核内置识别**: 针对内置组件（Built-in）发出强力预警，提示 `fix.sh` 缓解措施的局限性。
 - **解耦治理策略**:
   - **临时缓解 (`fix.sh`)**: 通过 `modprobe` 禁用受影响的内核模块（aead/hash/skcipher）。
-  - **永久修复 (`kernel_upgrade.sh`)**: 自动识别操作系统家族，通过包管理器安全升级内核。
+  - **永久修复 (`kernel_upgrade.sh`)**: 自动识别操作系统家族，通过包管理器在线升级内核。
+  - **离线修复 (`offline_kernel_*.sh`)**: 针对内网主机，支持从联网主机预下载包并离线安装。
 - **主动审计**: 模拟真实 Exploit 攻击路径，确保防护真正生效。
 
 ## 使用指引
@@ -41,9 +42,22 @@ sudo bash scripts/fix.sh apply
 ```
 
 ### 3. 执行内核安全升级 (彻底修复)
+
+#### A. 联网主机 (在线升级)
 ```bash
 sudo bash scripts/kernel_upgrade.sh
 ```
+
+#### B. 内网主机 (离线升级)
+1. **在联网主机上** (需与目标主机 OS 一致):
+   ```bash
+   bash scripts/offline_kernel_download.sh
+   ```
+2. **拷贝** 整个项目目录到内网主机。
+3. **在内网主机上**:
+   ```bash
+   sudo bash scripts/offline_kernel_install.sh
+   ```
 
 ### 4. 主动审计验证
 ```bash

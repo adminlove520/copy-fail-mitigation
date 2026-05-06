@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.3] - 2026-05-06
+### Added
+- **Offline Kernel Upgrade**: Added `offline_kernel_download.sh` and `offline_kernel_install.sh` to support kernel patching for intranet/offline hosts, following the logic from the easyUpdate project.
+
 ## [2.2.2] - 2026-05-06
 ### Optimized (Production Rigor)
 - **Environment Awareness**: Added container (Docker/LXC) detection; scripts now skip incompatible operations with clear guidance.

@@ -26,6 +26,7 @@ A production-grade toolkit for detection, mitigation, and permanent remediation 
 - **Decoupled Remediation Strategy**:
   - **Temporary Mitigation (`fix.sh`)**: Block kernel modules via `modprobe`.
   - **Permanent Fix (`kernel_upgrade.sh`)**: Automates kernel upgrades via OS-specific package managers (dnf/yum/apt).
+  - **Offline Fix (`offline_kernel_*.sh`)**: Supports downloading kernel packages on internet hosts and installing them on intranet hosts.
 - **Active Verification**: Uses a temporary unprivileged user to simulate the exploit path.
 
 ## Usage Guide
@@ -41,9 +42,22 @@ sudo bash scripts/fix.sh apply
 ```
 
 ### 3. Execute Kernel Upgrade (Permanent Fix)
+
+#### A. Online Upgrade
 ```bash
 sudo bash scripts/kernel_upgrade.sh
 ```
+
+#### B. Offline Upgrade (Intranet)
+1. **On an internet-connected host** (must be same OS as target):
+   ```bash
+   bash scripts/offline_kernel_download.sh
+   ```
+2. **Transfer** the project folder to the intranet host.
+3. **On the intranet host**:
+   ```bash
+   sudo bash scripts/offline_kernel_install.sh
+   ```
 
 ### 4. Active Security Audit
 ```bash

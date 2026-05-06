@@ -1,5 +1,6 @@
 #!/bin/bash
-# v2.1.0 - Anti-Hang Optimization
+# CVE-2026-31431 Mitigation Script (Module Blocklist)
+# v2.2.1 - Focused on Mitigation only
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/lib_common.sh"
@@ -11,81 +12,87 @@ CONF_FILE="/etc/modprobe.d/disable-algif-aead.conf"
 # Translations
 declare -A T
 if [[ "$CURRENT_LANG" == "zh" ]]; then
-    T[header]="CVE-2026-31431 (Copy Fail) 深度修复与验证"
+    T[header]="CVE-2026-31431 (Copy Fail) 漏洞缓解 (模块阻断)"
+    T[usage]="用法: $0 [apply|rollback] [-y]\n  apply    : 应用缓解措施 (禁用内核模块)\n  rollback : 还原系统配置"
     T[root_err]="错误: 必须以 root 权限运行。"
-    T[applying]="正在应用内核模块级阻断规则..."
-    T[unloading]="正在卸载相关内核模块..."
-    T[verifying]="执行深度有效性闭环验证..."
-    T[success]="修复成功: 所有漏洞利用路径已切断。"
-    T[partial]="部分生效: 部分接口仍可访问，建议检查内置模块或重启。"
-    T[fail]="修复失败: 关键接口仍可访问，请立即更新内核。"
-    T[reboot]="提示: 请重启系统或更新 initramfs 以确保隔离完全。"
-    T[rollback]="正在移除修复配置，恢复原始设置..."
+    T[mitigating]="[*] 正在应用内核模块级阻断规则..."
+    T[unloading]="[*] 正在尝试卸载受影响的内核模块..."
+    T[verifying]="[*] 执行有效性闭环验证..."
+    T[success]="[+] 缓解成功: 漏洞探测已被阻断。"
+    T[partial]="[!] 缓解受限: 接口仍可访问。检测到模块内置或正在使用，建议使用 scripts/kernel_upgrade.sh 进行升级。"
+    T[rollback_done]="[+] 配置已还原。"
 else
-    T[header]="CVE-2026-31431 (Copy Fail) Deep Remediation & Verification"
+    T[header]="CVE-2026-31431 (Copy Fail) Mitigation (Module Blocklist)"
+    T[usage]="Usage: $0 [apply|rollback] [-y]\n  apply    : Apply mitigation (Disable modules)\n  rollback : Restore configuration"
     T[root_err]="Error: Must run as root."
-    T[applying]="Applying kernel module blocklist..."
-    T[unloading]="Unloading related kernel modules..."
-    T[verifying]="Performing deep closed-loop verification..."
-    T[success]="SUCCESS: All exploit paths are now blocked."
-    T[partial]="PARTIAL: Some paths still open. Reboot recommended."
-    T[fail]="FAILED: Critical interface still accessible. Update kernel."
-    T[reboot]="Note: Reboot or update initramfs to ensure full isolation."
-    T[rollback]="Removing mitigation configuration..."
+    T[mitigating]="[*] Applying kernel module blocklist..."
+    T[unloading]="[*] Attempting to unload affected modules..."
+    T[verifying]="[*] Performing closed-loop verification..."
+    T[success]="[+] SUCCESS: Exploit path is now blocked."
+    T[partial]="[!] LIMITED: Interface still accessible. Built-in detected or in-use. Use scripts/kernel_upgrade.sh instead."
+    T[rollback_done]="[+] Configuration restored."
 fi
 
 [[ "$EUID" -ne 0 ]] && { log "${RED}" "${T[root_err]}"; exit 1; }
 
 ACTION=${1:-apply}
 [[ "$ACTION" == "-"* ]] && ACTION="apply"
+FORCE=0
+[[ "$*" == *"-y"* ]] && FORCE=1
+
+function usage() {
+    echo -e "${T[usage]}"
+    exit 1
+}
+
+function do_apply() {
+    print_step "MITIGATE" "${T[mitigating]}"
+    cat <<EOF > "$CONF_FILE"
+# Mitigation for CVE-2026-31431
+install algif_aead /bin/false
+install algif_hash /bin/false
+install algif_skcipher /bin/false
+EOF
+    for mod in algif_aead algif_hash algif_skcipher; do
+        modprobe -r "$mod" 2>/dev/null
+    done
+    echo 1 > /proc/sys/vm/drop_caches
+    
+    do_verify
+}
+
+function do_verify() {
+    print_step "VERIFY" "${T[verifying]}"
+    PROBE_RAW=$(check_unprivileged_crypto)
+    ACCESSIBLE_COUNT=0
+    IFS='|' read -ra ADDR <<< "$PROBE_RAW"
+    for i in "${ADDR[@]}"; do
+        IFS=':' read -ra VAL <<< "$i"
+        [[ "${VAL[1]}" == "OK" ]] && ((ACCESSIBLE_COUNT++))
+    done
+
+    echo -e "${BOLD}---------------------------------------------------------------${NC}"
+    if [[ $ACCESSIBLE_COUNT -eq 0 ]]; then
+        log "${GREEN}" "  ${T[success]}"
+    else
+        log "${RED}" "  ${T[partial]}"
+        is_builtin "algif_aead" && log "${RED}" "  [!] Built-in detected. Modprobe mitigation is NOT effective."
+    fi
+    echo -e "${BOLD}---------------------------------------------------------------${NC}"
+}
 
 print_banner
 echo -e "${BOLD}>>> ${T[header]}${NC}\n"
 
 case "$ACTION" in
     apply)
-        print_step "1/3" "${T[applying]}"
-        cat <<EOF > "$CONF_FILE"
-# Mitigation for CVE-2026-31431
-install algif_aead /bin/false
-install algif_hash /bin/false
-install algif_skcipher /bin/false
-EOF
-        
-        print_step "2/3" "${T[unloading]}"
-        for mod in algif_aead algif_hash algif_skcipher; do
-            modprobe -r "$mod" 2>/dev/null
-        done
-        
-        print_step "3/3" "${T[verifying]}"
-        PROBE_RAW=$(check_unprivileged_crypto)
-        
-        ACCESSIBLE_COUNT=0
-        IFS='|' read -ra ADDR <<< "$PROBE_RAW"
-        for i in "${ADDR[@]}"; do
-            IFS=':' read -ra VAL <<< "$i"
-            status=${VAL[1]}
-            [[ "$status" == "OK" ]] && ((ACCESSIBLE_COUNT++))
-        done
-
-        echo -e "${BOLD}---------------------------------------------------------------${NC}"
-        if [[ $ACCESSIBLE_COUNT -eq 0 ]]; then
-            log "${GREEN}" "  ${T[success]}"
-            log "${YELLOW}" "  ${T[reboot]}"
-        elif [[ $ACCESSIBLE_COUNT -lt ${#ADDR[@]} ]]; then
-            log "${YELLOW}" "  ${T[partial]}"
-            log "${RED}" "  [!] Accessible paths: $ACCESSIBLE_COUNT"
-        else
-            log "${RED}" "  ${T[fail]}"
-            is_builtin "algif_aead" && log "${RED}" "  [!] Built-in detected. Modprobe won't work."
-        fi
-        echo -e "${BOLD}---------------------------------------------------------------${NC}"
+        do_apply
         ;;
     rollback)
-        log "${BLUE}" "${T[rollback]}"
         rm -f "$CONF_FILE"
-        log "${GREEN}" "[+] Configuration restored."
+        log "${GREEN}" "${T[rollback_done]}"
         ;;
-    *) echo "Usage: $0 [apply|rollback]"; exit 1 ;;
+    *) usage ;;
 esac
+
 exit 0

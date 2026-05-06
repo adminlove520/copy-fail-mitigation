@@ -2,6 +2,13 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.0] - 2026-05-06
+### Added
+- **Kernel Upgrade Integration**: Added `upgrade` action to `fix.sh` to support permanent remediation via OS-specific package managers (dnf/yum/apt).
+- **Built-in Component Warning**: Detection script now explicitly warns if `algif_aead` is built-in and recommends a kernel upgrade.
+- **Improved OS Detection**: Enhanced `lib_common.sh` for better recognition of Rocky Linux, openEuler, and specific Xinchuang versions.
+- **Documentation**: Updated READMEs to reflect the transition from a mitigation-only toolkit to a full remediation suite.
+
 ## [2.1.0] - 2026-04-30
 
 ### Fixed (Stability & Performance)

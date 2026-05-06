@@ -1,6 +1,6 @@
 #!/bin/bash
 # Common Library for CVE-2026-31431 Mitigation Scripts
-# v2.1.0 - Robustness & Anti-Hang
+# v2.2.0 - OS Enhanced & Fix Logic
 
 # Colors
 RED='\033[1;31m'
@@ -12,6 +12,28 @@ BOLD='\033[1m'
 NC='\033[0m'
 
 LOG_FILE="/tmp/cve-2026-31431.log"
+
+# OS Identification & Package Manager
+SYSTEM_TYPE="unknown"
+PKG_MANAGER="unknown"
+
+function identify_system() {
+    if [ -f /etc/rocky-release ] || grep -qi 'rocky' /etc/os-release 2>/dev/null; then
+        SYSTEM_TYPE="rhel-like"; PKG_MANAGER="dnf"
+    elif [ -f /etc/kylin-release ]; then
+        SYSTEM_TYPE="rhel-like"; PKG_MANAGER="yum"
+    elif [ -f /etc/openeuler-release ]; then
+        SYSTEM_TYPE="rhel-like"; PKG_MANAGER="dnf"
+    elif [ -f /etc/redhat-release ] || [ -f /etc/centos-release ] || [ -f /etc/rhel-release ] || [ -f /etc/almalinux-release ]; then
+        SYSTEM_TYPE="rhel-like"; PKG_MANAGER="yum"
+        command -v dnf &>/dev/null && PKG_MANAGER="dnf"
+    elif [ -f /etc/debian_version ] || [ -f /etc/ubuntu-release ] || [ -f /etc/uos-release ]; then
+        SYSTEM_TYPE="debian-like"; PKG_MANAGER="apt"
+    fi
+}
+identify_system
+
+# ... (rest of lib_common.sh initialization) ...
 
 # Initialization: Setup log file safely
 function init_log() {

@@ -35,7 +35,25 @@ identify_system
 
 # ... (rest of lib_common.sh initialization) ...
 
-# Initialization: Setup log file safely
+# Helper: Check if vendor patch exists in changelog (Fix for False Positives)
+function check_vendor_patch() {
+    local cve="CVE-2026-31431"
+    if command -v rpm &>/dev/null; then
+        # Check running kernel package first
+        local current_k=$(uname -r)
+        if rpm -q --changelog "kernel-$(uname -r)" 2>/dev/null | grep -qi "$cve"; then
+            return 0
+        fi
+        # Fallback to general kernel package
+        if rpm -q --changelog kernel 2>/dev/null | grep -qi "$cve"; then
+            return 0
+        fi
+    fi
+    if command -v apt-get &>/dev/null && [ -f /usr/share/doc/linux-image-$(uname -r)/changelog.Debian.gz ]; then
+        zgrep -qi "$cve" /usr/share/doc/linux-image-$(uname -r)/changelog.Debian.gz && return 0
+    fi
+    return 1
+}
 function init_log() {
     # If log exists and not writable, try to recreate it
     if [[ -e "$LOG_FILE" && ! -w "$LOG_FILE" ]]; then

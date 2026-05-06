@@ -54,6 +54,13 @@ if version_ge "$K_VER" "4.14" && (version_lt "$K_VER" "6.18.22" || ([[ "$K_VER" 
     V_AFFECTED=1
 fi
 
+# 2.5 Vendor Patch Check (Crucial for Kylin/UOS/Euler)
+HAS_PATCH=0
+if check_vendor_patch; then
+    HAS_PATCH=1
+    log "${GREEN}" "  [+] Detected Vendor Patch for CVE-2026-31431 in kernel changelog."
+fi
+
 # 3. Deep Probing
 print_step "2/3" "${T[sec_status]}"
 PROBE_RAW=$(check_unprivileged_crypto)
@@ -84,7 +91,10 @@ fi
 # 5. Summary
 print_step "3/3" "Summary Report"
 echo -e "${BOLD}---------------------------------------------------------------${NC}"
-if [[ "$V_AFFECTED" -eq 0 ]]; then
+if [[ "$HAS_PATCH" -eq 1 ]]; then
+    log "${GREEN}" "  ${T[final_safe]} (Patch Verified)"
+    log "" "  ${T[recom_safe]}"
+elif [[ "$V_AFFECTED" -eq 0 ]]; then
     log "${GREEN}" "  ${T[final_safe]}"
     log "" "  ${T[recom_safe]}"
 elif [[ "$CAN_EXPLOIT" -eq 0 ]]; then

@@ -2,6 +2,11 @@
 
 All notable changes to this project will be documented in this file.
 
+## [2.2.5] - 2026-05-06
+### Added
+- **Anolis OS Support**: Added native support for Anolis OS (龙蜥) in OS identification logic. It is now correctly identified as `rhel-like`.
+- **Improved Compatibility**: Fixed `offline_kernel_download.sh` and `kernel_upgrade.sh` to handle Anolis OS 8.x and higher.
+
 ## [2.2.3] - 2026-05-06
 ### Added
 - **Offline Kernel Upgrade**: Added `offline_kernel_download.sh` and `offline_kernel_install.sh` to support kernel patching for intranet/offline hosts, following the logic from the easyUpdate project.

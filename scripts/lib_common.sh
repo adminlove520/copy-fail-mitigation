@@ -24,7 +24,7 @@ function identify_system() {
         SYSTEM_TYPE="rhel-like"; PKG_MANAGER="yum"
     elif [ -f /etc/openeuler-release ]; then
         SYSTEM_TYPE="rhel-like"; PKG_MANAGER="dnf"
-    elif [ -f /etc/redhat-release ] || [ -f /etc/centos-release ] || [ -f /etc/rhel-release ] || [ -f /etc/almalinux-release ]; then
+    elif [ -f /etc/redhat-release ] || [ -f /etc/centos-release ] || [ -f /etc/rhel-release ] || [ -f /etc/almalinux-release ] || [ -f /etc/anolis-release ]; then
         SYSTEM_TYPE="rhel-like"; PKG_MANAGER="yum"
         command -v dnf &>/dev/null && PKG_MANAGER="dnf"
     elif [ -f /etc/debian_version ] || [ -f /etc/ubuntu-release ] || [ -f /etc/uos-release ]; then
